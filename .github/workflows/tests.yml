@@ -22,9 +22,12 @@ jobs:
         sudo apt-get update
         sudo apt-get install libstdc++6 graphviz python3-dev libgraphviz-dev pkg-config
         python -m pip install --upgrade pip
+        pip install tox
         pip install -e .[tests]
         pip install termcolor cachetools
         git clone https://github.com/indralab/depmap_analysis.git
+    - name: Run documentation build tests
+      run: tox -e docs
     - name: Run unit tests
       run: |
         export NOSEATTR="!notravis"
