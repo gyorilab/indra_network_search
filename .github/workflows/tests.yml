@@ -3,6 +3,19 @@ name: Tests
 on: [push, pull_request]
 
 jobs:
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Python 3.7
+        uses: actions/setup-python@v1
+        with:
+          python-version: 3.7
+      - name: Install dependencies
+        run: |
+          pip install tox
+      - name: Run documentation build tests
+        run: tox -e docs
   build:
     runs-on: ubuntu-latest
     steps:
@@ -22,12 +35,9 @@ jobs:
         sudo apt-get update
         sudo apt-get install libstdc++6 graphviz python3-dev libgraphviz-dev pkg-config
         python -m pip install --upgrade pip
-        pip install tox
         pip install -e .[tests]
         pip install termcolor cachetools
         git clone https://github.com/indralab/depmap_analysis.git
-    - name: Run documentation build tests
-      run: tox -e docs
     - name: Run unit tests
       run: |
         export NOSEATTR="!notravis"
