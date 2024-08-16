@@ -55,7 +55,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-DEBUG = environ.get("API_DEBUG").lower() in TRUTHINESS
+DEBUG = (environ.get("API_DEBUG") or "").lower() in TRUTHINESS
 USE_GRAPH_CACHE = environ.get("USE_CACHE") in TRUTHINESS
 CACHE_RESULTS = environ.get("CACHE_RESULTS") in TRUTHINESS
 HEALTH = Health(status="booting")
