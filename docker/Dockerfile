@@ -24,5 +24,7 @@ ADD indranet_sign_node_graph.pkl $NETWORK_CACHE
 
 ENV PYTHONPATH /sw/depmap_analysis:/sw/indra_network_search
 ENV USE_CACHE 1
+ENV DUMPS_BUCKET "gyori-bigmech"
+ENV CACHE_RESULTS 1
 
 ENTRYPOINT ["gunicorn", "-w", "1", "-b", "0.0.0.0:8000", "-t", "600", "-k", "uvicorn.workers.UvicornWorker", "indra_network_search.rest_api:app"]
