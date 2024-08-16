@@ -38,6 +38,7 @@ logger = logging.getLogger(__name__)
 
 NAME = "INDRA Network Search"
 VERSION = "1.0.0"
+TRUTHINESS = ("1", "true", "t")
 
 app = FastAPI(
     title=NAME,
@@ -54,8 +55,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-DEBUG = environ.get("API_DEBUG") == "1"
-USE_CACHE = environ.get("USE_CACHE") == "1"
+DEBUG = environ.get("API_DEBUG").lower() in TRUTHINESS
+USE_GRAPH_CACHE = environ.get("USE_CACHE") in TRUTHINESS
+CACHE_RESULTS = environ.get("CACHE_RESULTS") in TRUTHINESS
 HEALTH = Health(status="booting")
 STATUS = ServerStatus(status="booting", graph_date="2022-01-11")
 network_search_api: IndraNetworkSearchAPI
@@ -227,7 +229,11 @@ def query(search_query: NetworkSearchQuery, background_tasks: BackgroundTasks):
     logger.info(f"Got NetworkSearchQuery #{query_hash}: {search_query.dict()}")
 
     # Check if results are on S3
-    keys_dict = check_existence_and_date_s3(query_hash=query_hash)
+    if CACHE_RESULTS:
+        keys_dict = check_existence_and_date_s3(query_hash=query_hash)
+    else:
+        keys_dict = {}
+
     if keys_dict.get("result_json_key"):
         logger.info("Found results cached on S3")
         results_json = file_opener(keys_dict["result_json_key"])
@@ -301,7 +307,7 @@ def startup_event():
             unsigned_multi_graph=False,
             sign_node_graph=True,
             sign_edge_graph=False,
-            use_cache=USE_CACHE,
+            use_cache=USE_GRAPH_CACHE,
         )
 
         try:
