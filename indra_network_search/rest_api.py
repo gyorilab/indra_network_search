@@ -248,11 +248,18 @@ def query(search_query: NetworkSearchQuery, background_tasks: BackgroundTasks):
             background_tasks.add_task(dump_query_json_to_s3, query_hash, search_query.dict())
 
     else:
-        logger.info("Performing new search")
+        if not CACHE_RESULTS:
+            logger.info("Cache is disabled, performing new search")
+        else:
+            logger.info("Performing new search")
         results = network_search_api.handle_query(rest_query=search_query)
-        logger.info("Uploading results to S3")
-        background_tasks.add_task(dump_result_json_to_s3, query_hash, results.dict())
-        background_tasks.add_task(dump_query_json_to_s3, query_hash, search_query.dict())
+
+        if CACHE_RESULTS:
+            logger.info("Uploading results to S3")
+            background_tasks.add_task(dump_result_json_to_s3, query_hash, results.dict())
+            background_tasks.add_task(dump_query_json_to_s3, query_hash, search_query.dict())
+        else:
+            logger.info("Cache is disabled, skipping S3 upload")
 
     return results
 
