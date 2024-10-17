@@ -15,7 +15,7 @@ RUN git clone https://github.com/indralab/indra_network_search.git && \
     pip install . && \
     cd .. && \
     mkdir -p $NETWORK_CACHE && \
-    pip install gunicorn uvicorn termcolor cachetools && \
+    pip install gunicorn uvicorn termcolor cachetools 'SQLAlchemy<1.4' && \
     git clone https://github.com/indralab/depmap_analysis.git && \
     python -m indra.ontology.bio build
 
