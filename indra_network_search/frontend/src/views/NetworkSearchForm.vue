@@ -229,6 +229,8 @@
                     label="Mesh IDs (comma separated)"
                     type="text"
                     :allowWhitespace="false"
+                    :errors="meshIdsFieldErrors"
+                    @blur="touchMeshIds"
                   />
                 </div>
                 <div class="col-4">
@@ -455,6 +457,7 @@ export default {
       max_per_node: DefaultValues.MAX_PER_NODE,
       cull_best_node: null,
       mesh_ids_text: "",
+      meshIdsTouched: false,
       strict_mesh_id_filtering: false,
       const_c: DefaultValues.CONST_C,
       const_tk: DefaultValues.CONST_TK,
@@ -613,6 +616,25 @@ export default {
     isNotOpenSearch() {
       return this.source.length > 0 && this.target.length > 0;
     },
+    meshContextMissingMeshIds() {
+      if (this.weighted !== "context") {
+        return false;
+      }
+      const ids = this.splitTrim(this.mesh_ids_text).filter((id) => id.length > 0);
+      return ids.length === 0;
+    },
+    meshIdsFieldErrors() {
+      if (!this.meshContextMissingMeshIds || !this.meshIdsTouched) {
+        return [];
+      }
+      return [
+        {
+          $uid: "mesh-context-requires-ids",
+          $message:
+            "At least one MeSH ID is required.",
+        },
+      ];
+    },
     cannotSubmit() {
       /**
        * Flag if source/target are valid
@@ -628,7 +650,14 @@ export default {
       // OR target is not valid when filled
       const trgtInvalid = this.target.length > 0 && !this.validTarget
 
-      return bothEmpty || srcWhiteSpace || trgtWhiteSpace || srcInvalid || trgtInvalid
+      return (
+        bothEmpty ||
+        srcWhiteSpace ||
+        trgtWhiteSpace ||
+        srcInvalid ||
+        trgtInvalid ||
+        this.meshContextMissingMeshIds
+      );
     },
     isContextWeighted() {
       return this.isContextSearch && !this.strict_mesh_id_filtering;
@@ -672,7 +701,9 @@ export default {
     contextErrors() {
       const c = this.v$.const_c.$errors.length;
       const tk = this.v$.const_tk.$errors.length;
-      return [c, tk].reduce((ps, a) => ps + a, 0);
+      const mesh =
+        this.meshContextMissingMeshIds && this.meshIdsTouched ? 1 : 0;
+      return [c, tk, mesh].reduce((ps, a) => ps + a, 0);
     },
     openErrors() {
       const mpn = this.v$.max_per_node.$errors.length;
@@ -697,6 +728,9 @@ export default {
     },
   },
   methods: {
+    touchMeshIds() {
+      this.meshIdsTouched = true;
+    },
     async sendForm() {
       const canSubmit = await this.v$.$validate();
       if (!canSubmit || this.cannotSubmit) {
@@ -880,6 +914,11 @@ export default {
     return false;
   },
   watch: {
+    weighted(newVal) {
+      if (newVal !== "context") {
+        this.meshIdsTouched = false;
+      }
+    },
     // Watch cannotSubmit and submit form if cannotSubmit === false
     cannotSubmit(newValue) {
       if (this.querySearchExec && newValue === false) {
