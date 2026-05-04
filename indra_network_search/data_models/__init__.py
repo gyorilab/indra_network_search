@@ -37,6 +37,7 @@ from pydantic import (
     conint,
     conlist,
     constr,
+    root_validator,
     validator,
 )
 
@@ -197,6 +198,19 @@ class NetworkSearchQuery(BaseModel):
         if isinstance(cbn, int) and cbn < 2:
             raise ValueError("cull_best_node must be integer > 1 if provided")
         return cbn
+
+    @root_validator
+    def mesh_ids_required_for_context(cls, values):
+        """MeSH context weighting requires at least one MeSH ID."""
+        # Todo: Also validate the mesh IDs
+        if values.get("weighted") != "context":
+            return values
+        mesh_ids = values.get("mesh_ids") or []
+        if not any(isinstance(m, str) and m.strip() for m in mesh_ids):
+            raise ValueError(
+                "mesh_ids must contain at least one MeSH ID when weighted is 'context'"
+            )
+        return values
 
     @classmethod
     def from_share_url(cls, share_url: str):
