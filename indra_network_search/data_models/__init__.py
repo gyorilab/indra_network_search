@@ -300,7 +300,7 @@ class ShortestSimplePathOptions(BaseModel):
     source: Union[str, Tuple[str, int]]
     target: Union[str, Tuple[str, int]]
     weight: Optional[str] = None
-    ignore_nodes: Optional[Set[str]] = None
+    ignore_nodes: Optional[Set[Union[str, Tuple[str, int]]]] = None
     ignore_edges: Optional[Set[Tuple[str, str]]] = None
     hashes: Optional[List[int]] = None
     ref_counts_function: Optional[Callable] = None

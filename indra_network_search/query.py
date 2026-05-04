@@ -84,6 +84,8 @@ class Query:
         self.query_hash: str = query.get_hash()
 
     def _get_node_blacklist(self) -> List[Union[str, Tuple[str, int]]]:
+        # If no node blacklist is provided, or the sign is None, return the node blacklist
+        # Otherwise, return the node blacklist with both positive and negative signs
         if not self.query.node_blacklist or self.query.sign is None:
             return self.query.node_blacklist
         else:
