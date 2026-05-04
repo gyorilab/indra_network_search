@@ -568,7 +568,13 @@ export default {
         filter_curated: this.filter_curated,
         allowed_ns: this.allowed_ns, // Pick from multi-select
         node_blacklist: this.splitTrim(this.node_blacklist_text),
-        path_length: this.path_length,
+        path_length:
+          this.path_length === "" ||
+          this.path_length == null ||
+          (typeof this.path_length === "number" && Number.isNaN(this.path_length)) ||
+          this.path_length === 0
+            ? null
+            : this.path_length,
         depth_limit: this.depth_limit,
         sign: this.sign === "" ? null : this.sign,
         weighted: this.weighted,
