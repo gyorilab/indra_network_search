@@ -417,6 +417,20 @@ def test_ssp_signed_belief_weighted():
     # Todo: test result
 
 
+def test_ssp_signed_node_blacklist():
+    from indra_network_search.search_api import IndraNetworkSearchAPI
+    nsq = NetworkSearchQuery(
+        filter_curated=False,
+        source="BRCA1",
+        target="BRCA2",
+        node_blacklist=["testosterone"],
+        sign=0,
+    )
+    network_search_api = IndraNetworkSearchAPI(unsigned_graph=unsigned_graph, signed_node_graph=signed_node_graph)
+    results = network_search_api.handle_query(rest_query=nsq)
+    # Todo: test result
+
+
 def test_ssp_z_score_weighted():
     # Create rest query - belief weighted
     brca1 = Node(name="BRCA1", namespace="HGNC", identifier="1100")
