@@ -46,7 +46,7 @@ class NodesTrie(SortedStringTrie):
             if node_name in name_indexing:
                 ix = 1
                 node_name += f"_{ix}"
-                # Increase index until no key is not present
+                # Increase index until key is not present
                 while node_name in name_indexing:
                     ix += 1
                     node_name = node.lower() + f"_{ix}"
