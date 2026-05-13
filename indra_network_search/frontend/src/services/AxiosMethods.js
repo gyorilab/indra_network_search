@@ -26,6 +26,11 @@ export default {
   auto(prefix) {
     return apiGetClient.get(`/autocomplete?prefix=${prefix}`);
   },
+  autocompleteMesh(prefix) {
+    return apiGetClient.get("/autocomplete-mesh-name", {
+      params: { prefix },
+    });
+  },
   checkNode(name) {
     return apiGetClient.get(`/node-name-in-graph?node-name=${name}`);
   },

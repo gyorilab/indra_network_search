@@ -223,12 +223,12 @@
                   />
                 </div>
                 <div class="col-4">
-                  <BaseInputBS
-                    v-model="mesh_ids_text"
+                  <MeshIdsAsyncMultiselect
+                    v-model="mesh_ids"
                     :disabled="weighted !== 'context'"
-                    label="Mesh IDs (comma separated)"
-                    type="text"
-                    :allowWhitespace="false"
+                    label="Mesh IDs"
+                    placeholder="Search MeSH by name, then select"
+                    title="Search MeSH by name; add multiple IDs as tags"
                     :errors="meshIdsFieldErrors"
                     @blur="touchMeshIds"
                   />
@@ -407,6 +407,7 @@
 import BaseSelectBS from "@/components/Form/BaseSelectBS";
 import BaseCheckboxBS from "@/components/Form/BaseCheckboxBS";
 import BaseInputBS from "@/components/Form/BaseInputBS";
+import MeshIdsAsyncMultiselect from "@/components/Form/MeshIdsAsyncMultiselect";
 import BaseInputAutoCompBS from "@/components/Form/BaseInputAutoCompBS";
 import ShareUrl from "@/components/Form/share-url/ShareUrl";
 import AxiosMethods from "@/services/AxiosMethods";
@@ -430,6 +431,7 @@ export default {
     BaseSelectBS,
     BaseCheckboxBS,
     BaseInputBS,
+    MeshIdsAsyncMultiselect,
     Multiselect,
     ShareUrl,
   },
@@ -456,7 +458,7 @@ export default {
       k_shortest: DefaultValues.K_SHORTEST,
       max_per_node: DefaultValues.MAX_PER_NODE,
       cull_best_node: null,
-      mesh_ids_text: "",
+      mesh_ids: [],
       meshIdsTouched: false,
       strict_mesh_id_filtering: false,
       const_c: DefaultValues.CONST_C,
@@ -587,7 +589,7 @@ export default {
         k_shortest: this.k_shortest,
         max_per_node: this.max_per_node,
         cull_best_node: this.cull_best_node,
-        mesh_ids: this.splitTrim(this.mesh_ids_text),
+        mesh_ids: [...this.mesh_ids],
         strict_mesh_id_filtering: this.strict_mesh_id_filtering,
         const_c: this.const_c,
         const_tk: this.const_tk,
@@ -611,7 +613,7 @@ export default {
       return this.nodeNamespaceOptions.map((obj) => obj.value)
     },
     isContextSearch() {
-      return this.mesh_ids_text.length > 0;
+      return this.mesh_ids.length > 0;
     },
     isNotOpenSearch() {
       return this.source.length > 0 && this.target.length > 0;
@@ -620,7 +622,9 @@ export default {
       if (this.weighted !== "context") {
         return false;
       }
-      const ids = this.splitTrim(this.mesh_ids_text).filter((id) => id.length > 0);
+      const ids = this.mesh_ids.filter(
+        (id) => typeof id === "string" && id.trim().length > 0
+      );
       return ids.length === 0;
     },
     meshIdsFieldErrors() {
@@ -829,7 +833,7 @@ export default {
         k_shortest: "input",
         max_per_node: "input",
         cull_best_node: "input",
-        mesh_ids: "input_join", // Join array to comma separated text
+        mesh_ids: "mesh_ids",
         strict_mesh_id_filtering: "checkbox",
         const_c: "input",
         const_tk: "input",
@@ -859,13 +863,22 @@ export default {
             }
           } else if (fillType === 'select' && this.isInOptions(key, value)) {
             this.$data[key] = value
+          } else if (fillType === "mesh_ids") {
+            const raw = value;
+            const arr = Array.isArray(raw)
+              ? raw
+              : String(raw)
+                  .split(",")
+                  .map((s) => s.trim())
+                  .filter(Boolean);
+            this.mesh_ids = arr;
           } else if (fillType === 'input_join') {
             const formKey = key + '_text'
             let fillVal
             if (value.constructor.name === 'Array') {
               fillVal = value.join(', ')
             } else {
-              fillVal = [value]
+              fillVal = String(value)
             }
             // Transform array to comma separated string
             this.$data[formKey] = fillVal
