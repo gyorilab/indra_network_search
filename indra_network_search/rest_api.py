@@ -65,7 +65,7 @@ network_search_api: IndraNetworkSearchAPI
 nsid_trie: NodesTrie
 nodes_trie: NodesTrie
 mesh_annotations_trie: NodesTrie
-reverse_mesh_map: dict[str, str]  # Maps name -> mesh curie
+mesh_annotations_dict: dict[str, str]  # Maps mesh curie -> name
 
 
 @app.get("/xrefs", response_model=List[List[str]])
@@ -139,16 +139,21 @@ def node_id_in_graph(
 def mesh_annotation_name_exists(
     mesh_name: str = RestQuery(..., min_length=1, alias="mesh-name"),
 ):
-    mesh_id = mesh_annotations_trie.get(mesh_name)
-    if mesh_id:
-        return mesh_name, mesh_id
+    mesh_entry = mesh_annotations_trie.get(mesh_name)
+    if mesh_entry is not None:
+        name, _, mesh_id, _ = mesh_entry
+        return name, mesh_id
 
 
 @app.get("/mesh-id-annotation-exists", response_model=Optional[Tuple[str, str]])
 def mesh_id_annotation_exists(
     mesh_id: str = RestQuery(..., min_length=1, alias="mesh-id"),
 ):
-    mesh_name = reverse_mesh_map.get(f"MESH:{mesh_id}")
+    if mesh_id.upper().startswith("MESH:"):
+        mesh_curie = mesh_id.upper()
+    else:
+        mesh_curie = f"MESH:{mesh_id.upper()}"
+    mesh_name = mesh_annotations_dict.get(mesh_curie)
     if mesh_name:
         return mesh_name, mesh_id
 
@@ -339,7 +344,7 @@ def sub_graph(search_query: SubgraphRestQuery):
 
 @app.on_event("startup")
 def startup_event():
-    global network_search_api, nsid_trie, nodes_trie, mesh_annotations_trie, reverse_mesh_map
+    global network_search_api, nsid_trie, nodes_trie, mesh_annotations_trie, mesh_annotations_dict
     # Todo: figure out how to do all the loading async so the server is
     #  available to respond to health checks while it's loading
     #  See:
@@ -350,7 +355,7 @@ def startup_event():
             unsigned_graph,
             signed_node_graph,
         )
-        from indra_network_search.tests import mesh_annotations_dict
+        from indra_network_search.tests import mesh_annotations_dict as mesh_annotations_dict_load
 
         dir_graph = unsigned_graph
         sign_node_graph = signed_node_graph
@@ -363,7 +368,7 @@ def startup_event():
             sign_edge_graph=False,
             use_cache=USE_GRAPH_CACHE,
         )
-        mesh_annotations_dict = load_mesh_annotation_lookup()
+        mesh_annotations_dict_load = load_mesh_annotation_lookup()
 
         try:
             assert all(data["weight"] >= MIN_WEIGHT for _, _, data in dir_graph.edges(data=True))
@@ -386,11 +391,10 @@ def startup_event():
     logger.info("Loading Trie structure with unsigned graph nodes")
     nodes_trie = NodesTrie.from_node_names(graph=dir_graph)
     nsid_trie = NodesTrie.from_node_ns_id(graph=dir_graph)
-    mesh_annotations_trie = NodesTrie.from_curie_name_dict(mesh_annotations_dict)
+    mesh_annotations_trie = NodesTrie.from_curie_name_dict(mesh_annotations_dict_load)
     # This will destroy a handful of mappings that don't have names in the
     # bio ontology, so we pop the '(unnamed)' entry
-    reverse_mesh_map = {v: k for k, v in mesh_annotations_dict.items()}
-    assert reverse_mesh_map.pop("(unnamed)")  # Check that it was actually popped
+    mesh_annotations_dict = mesh_annotations_dict_load
 
     # Set numbers for server status
     STATUS.unsigned_nodes = len(dir_graph.nodes)
