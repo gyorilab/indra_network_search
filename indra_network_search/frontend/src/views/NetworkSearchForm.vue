@@ -84,11 +84,10 @@
                     />
                   </div>
                   <div class="col">
-                    <BaseInputBS
-                      v-model="node_blacklist_text"
-                      label="Node Blacklist"
-                      type="text"
-                      :allowWhitespace="false"
+                    <BaseSelectBS
+                      v-model.number="sign"
+                      :options="signOptions"
+                      label="Signed Search"
                     />
                   </div>
                 </div>
@@ -105,10 +104,15 @@
                     />
                   </div>
                   <div class="col">
-                    <BaseSelectBS
-                      v-model.number="sign"
-                      :options="signOptions"
-                      label="Signed Search"
+                    <BaseInputBS
+                      v-model.number="belief_cutoff"
+                      :max="1.0"
+                      :min="0.0"
+                      :step="0.01"
+                      label="Belief Cutoff"
+                      type="number"
+                      :errors="v$.belief_cutoff.$errors"
+                      @blur="v$.belief_cutoff.$touch()"
                     />
                   </div>
                 </div>
@@ -125,15 +129,8 @@
                     />
                   </div>
                   <div class="col">
-                    <BaseInputBS
-                      v-model.number="belief_cutoff"
-                      :max="1.0"
-                      :min="0.0"
-                      :step="0.01"
-                      label="Belief Cutoff"
-                      type="number"
-                      :errors="v$.belief_cutoff.$errors"
-                      @blur="v$.belief_cutoff.$touch()"
+                    <NodeBlacklistAsyncMultiselect
+                      v-model="node_blacklist_selected"
                     />
                   </div>
                 </div>
@@ -408,6 +405,7 @@ import BaseSelectBS from "@/components/Form/BaseSelectBS";
 import BaseCheckboxBS from "@/components/Form/BaseCheckboxBS";
 import BaseInputBS from "@/components/Form/BaseInputBS";
 import MeshIdsAsyncMultiselect from "@/components/Form/MeshIdsAsyncMultiselect";
+import NodeBlacklistAsyncMultiselect from "@/components/Form/NodeBlacklistAsyncMultiselect";
 import BaseInputAutoCompBS from "@/components/Form/BaseInputAutoCompBS";
 import ShareUrl from "@/components/Form/share-url/ShareUrl";
 import AxiosMethods from "@/services/AxiosMethods";
@@ -432,6 +430,7 @@ export default {
     BaseCheckboxBS,
     BaseInputBS,
     MeshIdsAsyncMultiselect,
+    NodeBlacklistAsyncMultiselect,
     Multiselect,
     ShareUrl,
   },
@@ -446,7 +445,7 @@ export default {
       stmt_filter: [],
       filter_curated: true,
       allowed_ns: [],
-      node_blacklist_text: "",
+      node_blacklist_selected: [],
       path_length: null,
       depth_limit: DefaultValues.DEPTH_LIMIT,
       sign: null,
@@ -572,7 +571,7 @@ export default {
         stmt_filter: this.fplx_edges ? [...this.stmt_filter, 'fplx'] : this.stmt_filter, // Multiselect; add fplx edges
         filter_curated: this.filter_curated,
         allowed_ns: this.allowed_ns, // Pick from multi-select
-        node_blacklist: this.splitTrim(this.node_blacklist_text),
+        node_blacklist: [...this.node_blacklist_selected],
         path_length:
           this.path_length === "" ||
           this.path_length == null ||
@@ -822,7 +821,7 @@ export default {
         target: "input",
         stmt_filter: "multiselect",
         allowed_ns: "multiselect",
-        node_blacklist: "input_join", // Join array to comma separated text
+        node_blacklist: "node_blacklist_selected",
         path_length: "input",
         depth_limit: "input",
         sign: "select",
@@ -872,6 +871,15 @@ export default {
                   .map((s) => s.trim())
                   .filter(Boolean);
             this.mesh_ids = arr;
+          } else if (fillType === "node_blacklist_selected") {
+            const raw = value;
+            const arr = Array.isArray(raw)
+              ? raw
+              : String(raw)
+                  .split(",")
+                  .map((s) => s.trim())
+                  .filter(Boolean);
+            this.node_blacklist_selected = arr;
           } else if (fillType === 'input_join') {
             const formKey = key + '_text'
             let fillVal
