@@ -22,6 +22,7 @@ from indra_db.util.s3_path import S3Path
 
 __all__ = [
     "load_indra_graph",
+    "load_mesh_annotation_lookup",
     "check_existence_and_date_s3",
     "dump_result_json_to_s3",
     "dump_query_json_to_s3",
@@ -45,6 +46,7 @@ logger = logging.getLogger(__name__)
 
 API_PATH = path.dirname(path.abspath(__file__))
 CACHE = path.join(API_PATH, "_cache")
+MESH_ANNOTATION_LOOKUP = path.join(CACHE, "mesh_annotation_lookup.pkl")
 
 # Derived type hints
 StrNode = Union[str, Tuple[str, int]]
@@ -133,6 +135,19 @@ def get_latest_graphs() -> Dict[str, str]:
     if len(latest_graphs) == 0:
         logger.warning(f"Found no graphs at s3://{NET_BUCKET}" f"/{NETS_PREFIX}/*.pkl")
     return latest_graphs
+
+
+def load_mesh_annotation_lookup() -> dict[str, str]:
+    """Load the mesh annotation lookup
+
+    Returns
+    -------
+    :
+        Returns a dict mapping mesh id curies to their name as they are set in
+        `indra.ontology.bio.bio_ontology`
+    """
+    mesh_lookup = file_opener(MESH_ANNOTATION_LOOKUP)
+    return mesh_lookup
 
 
 def load_indra_graph(

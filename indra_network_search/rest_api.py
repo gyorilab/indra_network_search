@@ -4,7 +4,7 @@ The IndraNetworkSearch REST API
 import logging
 from datetime import date
 from os import environ
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from depmap_analysis.network_functions.net_functions import MIN_WEIGHT, bio_ontology
 from depmap_analysis.util.io_functions import file_opener
@@ -15,7 +15,7 @@ from pydantic import ValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from tqdm import tqdm
 
-from indra_network_search.autocomplete import NodesTrie, Prefixes
+from indra_network_search.autocomplete import NodesTrie, Prefixes, MeshPrefixes
 from indra_network_search.data_models import (
     MultiInteractorsRestQuery,
     MultiInteractorsResults,
@@ -31,6 +31,7 @@ from indra_network_search.rest_util import (
     dump_query_json_to_s3,
     dump_result_json_to_s3,
     load_indra_graph,
+    load_mesh_annotation_lookup
 )
 from indra_network_search.search_api import IndraNetworkSearchAPI
 
@@ -63,6 +64,8 @@ STATUS = ServerStatus(status="booting", graph_date="2025-08-05")
 network_search_api: IndraNetworkSearchAPI
 nsid_trie: NodesTrie
 nodes_trie: NodesTrie
+mesh_annotations_trie: NodesTrie
+mesh_annotations_dict: dict[str, str]  # Maps mesh curie -> name
 
 
 @app.get("/xrefs", response_model=List[List[str]])
@@ -132,6 +135,29 @@ def node_id_in_graph(
         return node
 
 
+@app.get("/mesh-annotation-exists", response_model=Optional[Tuple[str, str]])
+def mesh_annotation_name_exists(
+    mesh_name: str = RestQuery(..., min_length=1, alias="mesh-name"),
+):
+    mesh_entry = mesh_annotations_trie.get(mesh_name)
+    if mesh_entry is not None:
+        name, _, mesh_id, _ = mesh_entry
+        return name, mesh_id
+
+
+@app.get("/mesh-id-annotation-exists", response_model=Optional[Tuple[str, str]])
+def mesh_id_annotation_exists(
+    mesh_id: str = RestQuery(..., min_length=1, alias="mesh-id"),
+):
+    if mesh_id.upper().startswith("MESH:"):
+        mesh_curie = mesh_id.upper()
+    else:
+        mesh_curie = f"MESH:{mesh_id.upper()}"
+    mesh_name = mesh_annotations_dict.get(mesh_curie)
+    if mesh_name:
+        return mesh_name, mesh_id
+
+
 @app.get("/autocomplete", response_model=Prefixes)
 def get_prefix_autocomplete(
     prefix: str = RestQuery(..., min_length=1),
@@ -186,6 +212,31 @@ def get_prefix_autocomplete(
         nodes = nodes_trie.case_items(prefix=prefix, top_n=max_res)
     logger.info(f"Prefix query resolved with {len(nodes)} suggestions")
     return nodes
+
+
+@app.get("/autocomplete-mesh-name", response_model=MeshPrefixes)
+def get_prefix_autocomplete_mesh(
+    prefix: str = RestQuery(..., min_length=1),
+    max_res: int = RestQuery(100, alias="max-results"),
+) -> MeshPrefixes:
+    """Get the case-insensitive mesh annotation names starting with prefix
+
+    Parameters
+    ----------
+    prefix :
+        The prefix of an annotation name to search for.
+    max_res :
+        The number of results will be returned.
+
+    Returns
+    -------
+    :
+        A list of tuples of (node name, identifier)
+    """
+    annotations = mesh_annotations_trie.case_items_alpha(
+        prefix=prefix, top_n=max_res
+    )
+    return [(name, identifier) for name, _, identifier in annotations]
 
 
 @app.get("/health", response_model=Health)
@@ -293,7 +344,7 @@ def sub_graph(search_query: SubgraphRestQuery):
 
 @app.on_event("startup")
 def startup_event():
-    global network_search_api, nsid_trie, nodes_trie
+    global network_search_api, nsid_trie, nodes_trie, mesh_annotations_trie, mesh_annotations_dict
     # Todo: figure out how to do all the loading async so the server is
     #  available to respond to health checks while it's loading
     #  See:
@@ -304,6 +355,7 @@ def startup_event():
             unsigned_graph,
             signed_node_graph,
         )
+        from indra_network_search.tests import mesh_annotations_dict as mesh_annotations_dict_load
 
         dir_graph = unsigned_graph
         sign_node_graph = signed_node_graph
@@ -316,6 +368,7 @@ def startup_event():
             sign_edge_graph=False,
             use_cache=USE_GRAPH_CACHE,
         )
+        mesh_annotations_dict_load = load_mesh_annotation_lookup()
 
         try:
             assert all(data["weight"] >= MIN_WEIGHT for _, _, data in dir_graph.edges(data=True))
@@ -338,6 +391,10 @@ def startup_event():
     logger.info("Loading Trie structure with unsigned graph nodes")
     nodes_trie = NodesTrie.from_node_names(graph=dir_graph)
     nsid_trie = NodesTrie.from_node_ns_id(graph=dir_graph)
+    mesh_annotations_trie = NodesTrie.from_curie_name_dict(mesh_annotations_dict_load)
+    # This will destroy a handful of mappings that don't have names in the
+    # bio ontology, so we pop the '(unnamed)' entry
+    mesh_annotations_dict = mesh_annotations_dict_load
 
     # Set numbers for server status
     STATUS.unsigned_nodes = len(dir_graph.nodes)

@@ -10,10 +10,11 @@ from pytrie import SortedStringTrie
 from tqdm import tqdm
 
 # Derived types
-Prefixes = List[Tuple[str, str, str]]
+Prefixes = List[Tuple[str, str, str]]  # name, ns, id
+MeshPrefixes = List[Tuple[str, str]]  # name, id
 DirGraph = Union[DiGraph, MultiDiGraph]
 
-__all__ = ["NodesTrie", "Prefixes"]
+__all__ = ["NodesTrie", "Prefixes", "MeshPrefixes"]
 
 
 class NodesTrie(SortedStringTrie):
@@ -45,7 +46,7 @@ class NodesTrie(SortedStringTrie):
             if node_name in name_indexing:
                 ix = 1
                 node_name += f"_{ix}"
-                # Increase index until no key is not present
+                # Increase index until key is not present
                 while node_name in name_indexing:
                     ix += 1
                     node_name = node.lower() + f"_{ix}"
@@ -89,6 +90,40 @@ class NodesTrie(SortedStringTrie):
             }
         )
 
+    @classmethod
+    def from_curie_name_dict(cls, curie_name_dict: dict) -> "NodesTrie":
+        """Produce a NodesTrie instance from a dict mapping curies to names
+
+        Parameters
+        ----------
+        curie_name_dict:
+            A dict mapping curies to names
+
+        Returns
+        -------
+        :
+            An instance of a NodesTrie containing the names of each node of the
+            graph as keys and the corresponding (name, id) tuple as values.
+        """
+        name_indexing = {}
+
+        for curie, name in tqdm(
+            curie_name_dict.items(),
+            desc="Building autocomplete index from curie name dict"
+        ):
+            mesh_name_lower = name.lower()
+            db_ns, db_id = curie.split(":", 1)
+            if mesh_name_lower in name_indexing:
+                ix = 1
+                mesh_name_lower += f"_{ix}"
+                # Increase index until key is not present
+                while mesh_name_lower in name_indexing:
+                    ix += 1
+                    mesh_name_lower = name.lower() + f"_{ix}"
+            name_indexing[mesh_name_lower] = (name, db_ns, db_id, 0)
+        return cls(**name_indexing)
+
+
     def case_keys(self, prefix: Optional[str] = None, top_n: Optional[int] = 100) -> List[str]:
         """Case insensitive wrapper around NodeTrie.keys()
 
@@ -124,6 +159,26 @@ class NodesTrie(SortedStringTrie):
         return [
             (name, namespace, identifier)
             for name, namespace, identifier, _ in islice(sorted(res, key=lambda t: (t[3], t[0]), reverse=True), top_n)
+        ]
+
+    def case_items_alpha(self, prefix: Optional[str] = None, top_n: int = 100) -> Prefixes:
+        """Case insensitive wrapper around NodeTrie.items() sorted alphabetically
+
+        Parameters
+        ----------
+        prefix :
+            The prefix to search
+
+        Returns
+        -------
+        :
+            Return a list of (name, namespace, id) tuples sorted alphabetically
+            by name.
+        """
+        res = (tup for _, tup in self.items(prefix.lower()))
+        return [
+            (name, namespace, identifier)
+            for name, namespace, identifier, _ in islice(sorted(res, key=lambda t: t[0]), top_n)
         ]
 
 

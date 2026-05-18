@@ -7,10 +7,8 @@
           <li class="float-end">
             <a href="#">Back to top</a>
           </li>
-          <li><a href="https://indralab.github.io" target="_blank">INDRALAB</a></li>
-          <li><a href="http://hits.harvard.edu" target="_blank">Harvard Program in Therapeutic Science (HiTS)</a></li>
-          <li><b>Automated Scientific Discovery Framework </b>(ASDF)</li>
-          <li>The DARPA ASDF project develops algorithms and software for reasoning about complex mechanisms operating in the natural world, explaining large-scale data, assisting humans in generating actionable, model-based hypotheses and testing these hypotheses empirically.<br><i>ASDF is funded by the Defense Advanced Research Projects Agency under award W911NF018-1-0124.</i></li>
+          <li>This software is developed by the <a href="https://gyorilab.github.io/" target="_blank">Gyori Lab for Computational Biomedicine</a> at Northeastern University</li>
+          <li>This work was funded by DARPA grant W911NF018-1-0124 under the DARPA ASDF program.</li>
         </ul>
       </small>
     </footer>

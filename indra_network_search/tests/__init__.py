@@ -20,6 +20,7 @@ __all__ = [
     "hash_bl_edge1",
     "hash_bl_edge2",
     "_get_node",
+    "mesh_annotations_dict",
 ]
 
 wm = _weight_from_belief
@@ -43,6 +44,40 @@ nodes = {
     "NCOA": {"ns": "FPLX", "id": "NCOA"},
     "BRCA": {"ns": "FPLX", "id": "BRCA"},
 }
+
+
+mesh_annotations_dict = dict(
+    [
+        ("MESH:D000072230", "Sustained Virologic Response"),
+        ("MESH:D000067455", "No-Show Patients"),
+        ("MESH:D053669", "Syndecan-2"),
+        ("MESH:C535303", "Charcot-Marie-Tooth disease, X-linked recessive, 3"),
+        ("MESH:D006317", "Hearing Loss, Noise-Induced"),
+        ("MESH:C000648103", "Acetatifactor muris"),
+        ("MESH:D015370", "Infant Equipment"),
+        ("MESH:D031225", "Rorippa"),
+        ("MESH:D047348", "Hydrolyzable Tannins"),
+        ("MESH:D004027", "Diencephalon"),
+        ("MESH:D063127", "Secondary Care"),
+        ("MESH:C535273", "Presenile dementia, Kraepelin type"),
+        ("MESH:C000653063", "Burkholderia pyrrocinia"),
+        ("MESH:C537262", "Hereditary pancreatitis"),
+        ("MESH:D000092130", "Urticaria, Solar"),
+        ("MESH:D031661", "Fraxinus"),
+        ("MESH:D006099", "Granuloma"),
+        ("MESH:D015981", "Epidemiologic Factors"),
+        ("MESH:D025601", "Adenomatous Polyposis Coli Protein"),
+        ("MESH:D000089944", "Core Stability"),
+        ("MESH:C531609", "Diffuse alopecia"),
+        ("MESH:D005934", "Glucagon"),
+        ("MESH:D014872", "Water Movements"),
+        ("MESH:D050316", "Medical Order Entry Systems"),
+        ("MESH:C537171", "Paraquat lung"),
+        ("MESH:C123456", "(unnamed)"),  # To test IDs without names
+        ("MESH:C654321", "(unnamed)"),
+
+    ]
+)
 
 
 def _get_node(name: str) -> Node:

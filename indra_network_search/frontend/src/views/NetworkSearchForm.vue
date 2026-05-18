@@ -84,11 +84,10 @@
                     />
                   </div>
                   <div class="col">
-                    <BaseInputBS
-                      v-model="node_blacklist_text"
-                      label="Node Blacklist"
-                      type="text"
-                      :allowWhitespace="false"
+                    <BaseSelectBS
+                      v-model.number="sign"
+                      :options="signOptions"
+                      label="Signed Search"
                     />
                   </div>
                 </div>
@@ -105,10 +104,15 @@
                     />
                   </div>
                   <div class="col">
-                    <BaseSelectBS
-                      v-model.number="sign"
-                      :options="signOptions"
-                      label="Signed Search"
+                    <BaseInputBS
+                      v-model.number="belief_cutoff"
+                      :max="1.0"
+                      :min="0.0"
+                      :step="0.01"
+                      label="Belief Cutoff"
+                      type="number"
+                      :errors="v$.belief_cutoff.$errors"
+                      @blur="v$.belief_cutoff.$touch()"
                     />
                   </div>
                 </div>
@@ -125,15 +129,8 @@
                     />
                   </div>
                   <div class="col">
-                    <BaseInputBS
-                      v-model.number="belief_cutoff"
-                      :max="1.0"
-                      :min="0.0"
-                      :step="0.01"
-                      label="Belief Cutoff"
-                      type="number"
-                      :errors="v$.belief_cutoff.$errors"
-                      @blur="v$.belief_cutoff.$touch()"
+                    <NodeBlacklistAsyncMultiselect
+                      v-model="node_blacklist_selected"
                     />
                   </div>
                 </div>
@@ -223,12 +220,14 @@
                   />
                 </div>
                 <div class="col-4">
-                  <BaseInputBS
-                    v-model="mesh_ids_text"
+                  <MeshIdsAsyncMultiselect
+                    v-model="mesh_ids"
                     :disabled="weighted !== 'context'"
-                    label="Mesh IDs (comma separated)"
-                    type="text"
-                    :allowWhitespace="false"
+                    label="Mesh IDs"
+                    placeholder="Search MeSH by name, then select"
+                    title="Search MeSH by name; add multiple IDs as tags"
+                    :errors="meshIdsFieldErrors"
+                    @blur="touchMeshIds"
                   />
                 </div>
                 <div class="col-4">
@@ -405,6 +404,8 @@
 import BaseSelectBS from "@/components/Form/BaseSelectBS";
 import BaseCheckboxBS from "@/components/Form/BaseCheckboxBS";
 import BaseInputBS from "@/components/Form/BaseInputBS";
+import MeshIdsAsyncMultiselect from "@/components/Form/MeshIdsAsyncMultiselect";
+import NodeBlacklistAsyncMultiselect from "@/components/Form/NodeBlacklistAsyncMultiselect";
 import BaseInputAutoCompBS from "@/components/Form/BaseInputAutoCompBS";
 import ShareUrl from "@/components/Form/share-url/ShareUrl";
 import AxiosMethods from "@/services/AxiosMethods";
@@ -428,6 +429,8 @@ export default {
     BaseSelectBS,
     BaseCheckboxBS,
     BaseInputBS,
+    MeshIdsAsyncMultiselect,
+    NodeBlacklistAsyncMultiselect,
     Multiselect,
     ShareUrl,
   },
@@ -442,7 +445,7 @@ export default {
       stmt_filter: [],
       filter_curated: true,
       allowed_ns: [],
-      node_blacklist_text: "",
+      node_blacklist_selected: [],
       path_length: null,
       depth_limit: DefaultValues.DEPTH_LIMIT,
       sign: null,
@@ -454,7 +457,8 @@ export default {
       k_shortest: DefaultValues.K_SHORTEST,
       max_per_node: DefaultValues.MAX_PER_NODE,
       cull_best_node: null,
-      mesh_ids_text: "",
+      mesh_ids: [],
+      meshIdsTouched: false,
       strict_mesh_id_filtering: false,
       const_c: DefaultValues.CONST_C,
       const_tk: DefaultValues.CONST_TK,
@@ -567,8 +571,14 @@ export default {
         stmt_filter: this.fplx_edges ? [...this.stmt_filter, 'fplx'] : this.stmt_filter, // Multiselect; add fplx edges
         filter_curated: this.filter_curated,
         allowed_ns: this.allowed_ns, // Pick from multi-select
-        node_blacklist: this.splitTrim(this.node_blacklist_text),
-        path_length: this.path_length,
+        node_blacklist: [...this.node_blacklist_selected],
+        path_length:
+          this.path_length === "" ||
+          this.path_length == null ||
+          (typeof this.path_length === "number" && Number.isNaN(this.path_length)) ||
+          this.path_length === 0
+            ? null
+            : this.path_length,
         depth_limit: this.depth_limit,
         sign: this.sign === "" ? null : this.sign,
         weighted: this.weighted,
@@ -578,7 +588,7 @@ export default {
         k_shortest: this.k_shortest,
         max_per_node: this.max_per_node,
         cull_best_node: this.cull_best_node,
-        mesh_ids: this.splitTrim(this.mesh_ids_text),
+        mesh_ids: [...this.mesh_ids],
         strict_mesh_id_filtering: this.strict_mesh_id_filtering,
         const_c: this.const_c,
         const_tk: this.const_tk,
@@ -602,10 +612,31 @@ export default {
       return this.nodeNamespaceOptions.map((obj) => obj.value)
     },
     isContextSearch() {
-      return this.mesh_ids_text.length > 0;
+      return this.mesh_ids.length > 0;
     },
     isNotOpenSearch() {
       return this.source.length > 0 && this.target.length > 0;
+    },
+    meshContextMissingMeshIds() {
+      if (this.weighted !== "context") {
+        return false;
+      }
+      const ids = this.mesh_ids.filter(
+        (id) => typeof id === "string" && id.trim().length > 0
+      );
+      return ids.length === 0;
+    },
+    meshIdsFieldErrors() {
+      if (!this.meshContextMissingMeshIds || !this.meshIdsTouched) {
+        return [];
+      }
+      return [
+        {
+          $uid: "mesh-context-requires-ids",
+          $message:
+            "At least one MeSH ID is required.",
+        },
+      ];
     },
     cannotSubmit() {
       /**
@@ -622,7 +653,14 @@ export default {
       // OR target is not valid when filled
       const trgtInvalid = this.target.length > 0 && !this.validTarget
 
-      return bothEmpty || srcWhiteSpace || trgtWhiteSpace || srcInvalid || trgtInvalid
+      return (
+        bothEmpty ||
+        srcWhiteSpace ||
+        trgtWhiteSpace ||
+        srcInvalid ||
+        trgtInvalid ||
+        this.meshContextMissingMeshIds
+      );
     },
     isContextWeighted() {
       return this.isContextSearch && !this.strict_mesh_id_filtering;
@@ -666,7 +704,9 @@ export default {
     contextErrors() {
       const c = this.v$.const_c.$errors.length;
       const tk = this.v$.const_tk.$errors.length;
-      return [c, tk].reduce((ps, a) => ps + a, 0);
+      const mesh =
+        this.meshContextMissingMeshIds && this.meshIdsTouched ? 1 : 0;
+      return [c, tk, mesh].reduce((ps, a) => ps + a, 0);
     },
     openErrors() {
       const mpn = this.v$.max_per_node.$errors.length;
@@ -691,6 +731,9 @@ export default {
     },
   },
   methods: {
+    touchMeshIds() {
+      this.meshIdsTouched = true;
+    },
     async sendForm() {
       const canSubmit = await this.v$.$validate();
       if (!canSubmit || this.cannotSubmit) {
@@ -778,7 +821,7 @@ export default {
         target: "input",
         stmt_filter: "multiselect",
         allowed_ns: "multiselect",
-        node_blacklist: "input_join", // Join array to comma separated text
+        node_blacklist: "node_blacklist_selected",
         path_length: "input",
         depth_limit: "input",
         sign: "select",
@@ -789,7 +832,7 @@ export default {
         k_shortest: "input",
         max_per_node: "input",
         cull_best_node: "input",
-        mesh_ids: "input_join", // Join array to comma separated text
+        mesh_ids: "mesh_ids",
         strict_mesh_id_filtering: "checkbox",
         const_c: "input",
         const_tk: "input",
@@ -819,13 +862,31 @@ export default {
             }
           } else if (fillType === 'select' && this.isInOptions(key, value)) {
             this.$data[key] = value
+          } else if (fillType === "mesh_ids") {
+            const raw = value;
+            const arr = Array.isArray(raw)
+              ? raw
+              : String(raw)
+                  .split(",")
+                  .map((s) => s.trim())
+                  .filter(Boolean);
+            this.mesh_ids = arr;
+          } else if (fillType === "node_blacklist_selected") {
+            const raw = value;
+            const arr = Array.isArray(raw)
+              ? raw
+              : String(raw)
+                  .split(",")
+                  .map((s) => s.trim())
+                  .filter(Boolean);
+            this.node_blacklist_selected = arr;
           } else if (fillType === 'input_join') {
             const formKey = key + '_text'
             let fillVal
             if (value.constructor.name === 'Array') {
               fillVal = value.join(', ')
             } else {
-              fillVal = [value]
+              fillVal = String(value)
             }
             // Transform array to comma separated string
             this.$data[formKey] = fillVal
@@ -874,6 +935,11 @@ export default {
     return false;
   },
   watch: {
+    weighted(newVal) {
+      if (newVal !== "context") {
+        this.meshIdsTouched = false;
+      }
+    },
     // Watch cannotSubmit and submit form if cannotSubmit === false
     cannotSubmit(newValue) {
       if (this.querySearchExec && newValue === false) {

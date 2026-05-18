@@ -6,6 +6,7 @@
       :value="modelValue"
       :placeholder="ph"
       :title="compTitle"
+      @blur="$emit('blur', $event)"
       @input="$emit('update:modelValue', $event.target.value)"
       class="form-control"
     />
@@ -25,6 +26,7 @@
 import UniqueID from "@/helpers/BasicHelpers";
 
 export default {
+  emits: ["update:modelValue", "blur"],
   props: {
     label: {
       type: String,
